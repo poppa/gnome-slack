@@ -10,34 +10,47 @@ using Gtk;
 using Gdk;
 using WebKit;
 
-public class SlackBrowser : Gtk.Window
+public class SlackBrowser : Gtk.Application
 {
-  private const string TITLE      = "Slack - Gnome";
+  private const string TITLE      = "Slack";
   private const string HOME_URL   = "https://slack.com/signin";
   private const string USER_AGENT = "Slack Browser For Gnome - v0.1";
   private const string SLACK_ICON = "Slack_Icon.png";
+  private const string APP_NAME   = "Slack";
   private string confdir;
   private string icon_path;
 
+  private Gtk.ApplicationWindow window;
   private WebView web_view;
+
 
   public SlackBrowser ()
   {
-    setup_confdir();
+    Object(application_id: "com.poppa.slack",
+           flags: ApplicationFlags.FLAGS_NONE);
+  }
+
+  protected override void activate()
+  {
+    window = new Gtk.ApplicationWindow(this);
+    window.title = TITLE;
+    window.set_default_size (1200, 800);
+
+    setup_confdir ();
     setup_icon ();
 
     try {
       var icon = new Gdk.Pixbuf.from_file (icon_path);
-      set_icon (icon);
+      window.set_icon (icon);
     }
     catch (Error e) {
       stderr.printf ("Unable to resolve Slack icon\n");
     }
 
-    this.title = SlackBrowser.TITLE;
-    set_default_size (1200, 800);
     create_widgets ();
     connect_signals ();
+    window.show_all ();
+    web_view.load_uri (SlackBrowser.HOME_URL);
   }
 
 
@@ -77,9 +90,11 @@ public class SlackBrowser : Gtk.Window
     conf.media_playback_allows_inline          = true;
     conf.user_agent                            = USER_AGENT;
 
-    this.web_view = new WebView.with_settings (conf);
+    web_view = new WebView.with_settings (conf);
 
-    var ctx = this.web_view.get_context ();
+    // web_view.resource_load_started.connect (on_load_changed);
+
+    var ctx = web_view.get_context ();
     var cookiefile = Path.build_filename (confdir, "cookies");
     var cm = ctx.get_cookie_manager ();
     cm.set_accept_policy (CookieAcceptPolicy.ALWAYS);
@@ -87,30 +102,25 @@ public class SlackBrowser : Gtk.Window
 
     var scrolled_window = new ScrolledWindow (null, null);
     scrolled_window.set_policy (PolicyType.AUTOMATIC, PolicyType.AUTOMATIC);
-    scrolled_window.add (this.web_view);
+    scrolled_window.add (web_view);
 
-    add (scrolled_window);
+    window.add (scrolled_window);
   }
+
+  // private void on_load_changed (WebKit.WebResource rec, WebKit.URIRequest uri)
+  // {
+  //   debug ("on_load_changed\n");
+  // }
 
   private void connect_signals ()
   {
-    this.destroy.connect (Gtk.main_quit);
   }
 
-  public void start ()
-  {
-    show_all ();
-    this.web_view.load_uri (SlackBrowser.HOME_URL);
-  }
 
   public static int main (string[] args)
   {
-    Gtk.init (ref args);
-
-    var browser = new SlackBrowser ();
-    browser.start ();
-    Gtk.main ();
-
-    return 0;
+    Environment.set_application_name (APP_NAME);
+    var app = new SlackBrowser ();
+    return app.run (args);
   }
 }
